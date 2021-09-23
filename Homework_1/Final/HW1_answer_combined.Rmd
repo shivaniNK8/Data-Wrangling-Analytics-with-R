@@ -1,0 +1,129 @@
+---
+title: "Farmers Market"
+output: html_document
+---
+# Homework 1 (Submitted by: Luyao Xu, Shivani Shrikant Naik, Zijie Li)
+```{r}
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(stringr)
+
+```
+
+#Reading Farmers Market Data and Wine data
+```{r}
+fm_df <- read.csv('fm.csv')
+wine_df <- read.csv('wine_data.csv')
+```
+
+#1.1  Compute the number of farmers market in the United States
+```{r}
+num_markets <- length(unique(fm_df$FMID))
+print(paste0("Number of farmers markets in United States: ", num_markets))
+```
+
+#1.2  Compute the number of farmers market in Massachusetts
+```{r}
+num_markets_ma <- length(which(fm_df$State == "Massachusetts"))
+print(paste0("Number of farmers markets in Massachusetts: ", num_markets_ma))
+
+```
+
+#1.3 Count the number of farmers market that offer coffee in the state of California
+```{r}
+coffee_count <- fm_df %>%
+                filter(State == "California", Coffee == "Y")
+print(paste0("Number of Farmers markets that offer Coffee in California: ", dim(coffee_count)[1]))
+```
+
+#1.4 Separate Season1Date into Startdate and Enddate, Calculate SeasonDuration (In days)
+```{r}
+
+#Split Season1Date into Startdate and Enddate fields
+x <- fm_df %>% 
+  separate(Season1Date, into = c("Startdate", "Enddate"), sep = " to ")
+
+fm_df$Startdate <- x$Startdate
+fm_df$Enddate <- x$Enddate
+
+#Assumption: Season duration where month names are mentioned will be calculated from beginning of 
+#Start month to beginning of End month, eg May to July would be 05-01 to 07-01
+
+#Parse dates : convert all month names to start of month eg "May" to 0000-05-01 UTC
+fm_df$Startdate <- parse_date_time(fm_df$Startdate, c("b", "mdy"))
+fm_df$Enddate <- parse_date_time(fm_df$Enddate, c("b", "mdy"))
+
+#Create a duration object to calculate season duration, will work for most cases, handle extra cases below
+duration_vec <- fm_df$Startdate %--% fm_df$Enddate
+season_duration <- as.duration(duration_vec) / ddays(1)
+fm_df$SeasonDuration <- season_duration
+
+#-------------------------------------------------------------------------------------------------------------
+# Handling season duration (negative) for cases like 
+#   1. November - April (gets parsed to 0000-11-01 UTC to 0000-04-01 UTC)
+#   2. 2012-06-11 to October etc 
+#-------------------------------------------------------------------------------------------------------------
+  
+#Filter rows with negative duration, ignore FMID 1011959 as it has invalid data entry for Season1Date = 10/01/2016 to 05/07/2016 (m/d/y)
+neg_duration <- fm_df %>%
+                filter(SeasonDuration < 0)  
+
+#Adding one year to End date year for cases like November to April (lubridate assigns year 0 if only month names are present)
+year(neg_duration[month(neg_duration$Startdate) > month(neg_duration$Enddate) & (year(neg_duration$Startdate) == 0) & (year(neg_duration$Enddate) == 0), ]$Enddate) <- 1
+
+#Handling year for cases like 2012-06-11 to October (Startdate year is non-zero, Enddate year will be 0),
+#Assign Startdate year to Enddate
+neg_duration_end_month <- neg_duration[month(neg_duration$Startdate) < month(neg_duration$Enddate) & (year(neg_duration$Startdate) != 0) & (year(neg_duration$Enddate) == 0), ]
+year(neg_duration_end_month$Enddate) <- year(neg_duration_end_month$Startdate)
+
+#Replace Enddates to include above calculated end dates, create one final dataframe
+neg_duration$Enddate <- replace(neg_duration$Enddate, as.numeric(rownames(neg_duration_end_month)), neg_duration_end_month$Enddate)
+
+#Correct the season duration for these entries, same as above
+duration_vec <- neg_duration$Startdate %--% neg_duration$Enddate
+season_duration <- as.duration(duration_vec) / ddays(1)
+neg_duration$SeasonDuration <- season_duration
+
+fm_df$SeasonDuration[match(neg_duration$FMID, fm_df$FMID)] <- neg_duration$SeasonDuration
+
+print(fm_df)
+```
+
+#2.1 Calculate 20 year old Wine 
+```{r}
+ind <- str_which(wine_df$designation, regex("20.yr|20.year", ignore_case = TRUE))
+wine_number <- dim(wine_df[ind,])[1]
+print(paste0("Number of 20 year old wines: ", wine_number))
+
+```
+
+#2.2 Average wine prices by country
+```{r}
+wine_agg <- wine_df %>% 
+        group_by(country) %>%
+        summarise(mean_price = mean(price, na.rm=TRUE))
+print("Average wine prices by country:")
+print(wine_agg)
+
+#Same aggregation solution using for loop:
+#---------------------------------------------------
+
+countries <- unique(wine_df$country)
+agg_df <- data.frame(country = character(),
+                     mean_price = double())
+
+#filter by country and calculate mean
+for (c in countries){
+  temp_df <- wine_df[wine_df$country == c, ]
+  mean_value <- mean(temp_df$price, na.rm = T)
+  result_df <- data.frame(country = c(c),
+                          mean_price = c(mean_value)
+  )
+  agg_df <- rbind(agg_df, result_df) #Bind new entries
+  agg_df <- agg_df %>%    #Sort by country
+    arrange(country)
+}
+print(agg_df)
+#-----------------------------------------------------
+```
