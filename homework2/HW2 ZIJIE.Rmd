@@ -1,0 +1,243 @@
+#Homework2
+
+```{r}
+#Problem1
+x <- c(1:1000)
+t1 <- Sys.time()
+for (i in 1:1000) {
+  x[i] <- x[i] * 2
+}
+t2 <- Sys.time()
+print(t2 - t1)
+
+t3 <- Sys.time()
+for (i in 1:1000) {
+  x <- x * 2
+}
+t4 <- Sys.time()
+print(t4 - t3)
+
+#for x<- 1:100000
+x <- c(1:100000)
+t5 <- Sys.time()
+for (i in 1:100000) {
+  x[i] <- x[i] * 2
+}
+t6 <- Sys.time()
+print(t6 - t5)
+
+t7 <- Sys.time()
+for (i in 1:100000) {
+  x <- x * 2
+}
+t8 <- Sys.time()
+print(t8 - t7)
+
+#for x<-1:1000000
+x <- c(1:1000000)
+t9 <- Sys.time()
+for (i in 1:1000000) {
+  x[i] <- x[i] * 2
+}
+t10 <- Sys.time()
+print(t10 - t9)
+
+t11 <- Sys.time()
+for (i in 1:1000000) {
+  x <- x * 2
+}
+t12 <- Sys.time()
+print(t12 - t11)
+
+#for x<-1:10000000
+x <- c(1:10000000)
+t13 <- Sys.time()
+for (i in 1:10000000) {
+  x[i] <- x[i] * 2
+}
+t14 <- Sys.time()
+print(t14 - t13)
+
+t15 <- Sys.time()
+for (i in 1:10000000) {
+  x <- x * 2
+}
+t16 <- Sys.time()
+print(t16 - t15)
+
+#for different length of vector x, the opreation time would increase when the length of vector
+#increased. For the opreation that each iteration multiply the value ofx[i]by 2, there is not a #big time difference with different length. For using vector operationx<- x*2, the opreation time
+#will be much longer when the length of vector increased.
+```
+
+```{r}
+#problem 2
+df_func <- function(df, arg2){
+  if(!is.numeric(arg2)){
+    stop('This function only works for numeric inputs!\n',
+         'You have provided objects of the following classes:\n',
+         'arg1: ', class(arg1), '\n')
+  }
+  smp <- df[sample(1:nrow(df), arg2, replace = F),]
+  return(smp)
+}
+
+```
+
+```{r}
+#Problem 3
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(lubridate)
+
+#3.1
+ste <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  group_by(provider_state) %>%
+  summarise(num_of_facility=n_distinct(federal_provider_number)) %>%
+  drop_na()
+
+desc_ste <- ste[order(-ste$num_of_facility),]
+```
+
+```{r}
+#3.2
+cty <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  group_by(county) %>%
+  summarise(num_of_fac=n_distinct(federal_provider_number)) %>%
+  drop_na()
+
+desc_cty <- cty[order(-cty$num_of_fac),]
+top_n(desc_cty,5)
+```
+
+```{r}
+#3.3
+
+stg_nurs <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(shortage_of_nursing_staff=="Y") %>%
+  group_by(provider_state, federal_provider_number) %>%
+  summarise(num_of_weeks=n()) %>%
+  filter(num_of_weeks > 20)
+shortage_fac_num <- stg_nurs %>%
+  group_by(provider_state) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_num<- merge(shortage_fac_num,ste, by=c('provider_state'))
+
+stg_clin <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(shortage_of_clinical_staff=="Y") %>%
+  group_by(provider_state, federal_provider_number) %>%
+  summarise(num_of_weeks=n()) %>%
+  filter(num_of_weeks > 20)
+shortage_fac_num_clin <- stg_clin %>%
+  group_by(provider_state) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_num_clin<- merge(shortage_fac_num_clin,ste, by=c('provider_state'))
+
+stg_aides <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(shortage_of_aides=="Y") %>%
+  group_by(provider_state, federal_provider_number) %>%
+  summarise(num_of_weeks=n()) %>%
+  filter(num_of_weeks > 20)
+shortage_fac_num_aides <- stg_aides %>%
+  group_by(provider_state) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_num_aides<- merge(shortage_fac_num_aides,ste, by=c('provider_state'))
+
+stg_other <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(shortage_of_other_staff=="Y") %>%
+  group_by(provider_state, federal_provider_number) %>%
+  summarise(num_of_weeks=n()) %>%
+  filter(num_of_weeks > 20)
+shortage_fac_num_other <- stg_other %>%
+  group_by(provider_state) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_num_other<- merge(shortage_fac_num_other,ste, by=c('provider_state'))
+```
+
+```{r}
+#3.4
+county_num <- unique(COVID_19_Nursing_Home_Data_2021_09_12$county)
+length(county_num)
+
+stg_N95 <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_n95_masks=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_N95 <- stg_N95 %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_N95<- merge(shortage_fac_N95,cty, by=c('county'))
+
+stg_Surge <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_surgical_masks=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_Surge <- stg_Surge %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_Surge<- merge(shortage_fac_Surge,cty, by=c('county'))
+
+stg_eye <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_eye_protection=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_eye <- stg_eye %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_eye<- merge(shortage_fac_eye,cty, by=c('county'))
+
+stg_gown <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_gowns=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_gown <- stg_gown %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_gown<- merge(shortage_fac_gown,cty, by=c('county'))
+
+stg_gloves <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_gloves=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_gloves <- stg_gloves %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_gloves<- merge(shortage_fac_gloves,cty, by=c('county'))
+
+stg_HS <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_hand_sanitizer=="N") %>%
+  group_by(county, federal_provider_number) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+shortage_fac_hs <- stg_HS %>%
+  group_by(county) %>%
+  summarise(stg_fac_num=n())
+shortage_fac_hs<- merge(shortage_fac_hs,cty, by=c('county'))
+```
+
+```{r}
+#3.5
+stg_ven <- COVID_19_Nursing_Home_Data_2021_09_12 %>%
+  filter(one_week_supply_of_ventilator_supplies=="N") %>%
+  group_by(federal_provider_number,provider_name) %>%
+  summarise(shortage_weeks=n()) %>%
+  filter(shortage_weeks >10)
+```
+
+
+
+
+
+
+
+
+
+
+
+
