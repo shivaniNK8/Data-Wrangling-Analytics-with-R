@@ -2,20 +2,15 @@
   title: "Homework 2"
 output: html_document
 ---
-  ```{r}
 library(dplyr)
 library(dlookr)
 library(lubridate)
-```
 
 #Read data
-```{r}
 covid_df <- read.csv("~/Desktop/IE5374HW/HW2/COVID_19_Nursing_Home_Data_2021_09_12.csv")
 covid_df$week_ending <- as.Date(covid_df$week_ending)
-```
 
 #Problem 1
-```{r}
 options(scipen = 999)
 vector_len <- c(1000, 100000, 1000000, 10000000)
 
@@ -40,16 +35,19 @@ for(l in vector_len){
 }
 
 #OBSERVATIONS
-#AS the length of x increases, itis not affect the running time on the method of vector operation very much\n'
-'but time running increases obviously on the for loop method. Thus it is better to use the vector operation \n'
-'to generate a vector ./n'
+#AS the size of vector increases,  running time on the method of vector operation not affected very much\n'
+'but it takes several times slower on the for loop,ranging from2x-10x. /n'
+'In other words, vector operation perfomance is much better than the for loop./n'
+'So if we are facing the similiar problem, we should consider other method /n'
+'like vector operation to avoid using for loop./n'
+
+
 
 #Problem 2
 #Write a custom function that accepts a dataframe from the user and returns a dataframesample /n'
 'with a random number of records. The fraction of records must be given by the user /n'
 'inthe form of an argument. If the user enters a non-numeric argument, notify /n'
 'using an errormessage that they have to enter a numeric value./n'
-```{r}
 set.seed(3)
 frac_rows <- function(df, n = 1000){
   if(!is.numeric(n)){
@@ -68,7 +66,6 @@ frac_rows <- function(df, n = 1000){
 }
 
 df_subset <- frac_rows(covid_df, 100)
-```
 
 #3.1  Number of nursing home facilities by state and order them in descending order
 covid_df %>%
@@ -84,7 +81,7 @@ length(unique(temp$federal_provider_number ))
 
 #3.2 Top five counties by number of nursing home facilities
 covid_df %>%
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number)) %>%
   arrange(desc(total_facilities)) %>%
   top_n(5)
@@ -239,7 +236,6 @@ final_shortage_df %>%
 #3.4 Counties that faced more than 10 weeks shortage of N95 masks (table 1), /n'
 'surgical masks (table 2), eye protection (table 3), supply of gowns (table 4), /n'
 'supply of gloves (table 5), and supply of hand sanitizer (table 6)/n'
-```{r}
 table_1 <-covid_df %>%
   filter(one_week_supply_of_n95_masks == "N") %>%
   group_by(county) %>%
@@ -281,17 +277,17 @@ table_6 <- covid_df %>%
 # we are doing the same approach as we did in 3.3
 #--------------N95 Mask --------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_n95_masks == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(N95_mask_shortage = n_distinct(week_ending)) %>%
   filter(N95_mask_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -301,17 +297,17 @@ final_shortage_df %>%
 
 #--------------Surgical Mask --------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_surgical_masks == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(surgical_mask_shortage = n_distinct(week_ending)) %>%
   filter(surgical_mask_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -321,17 +317,17 @@ final_shortage_df %>%
 
 #--------------eye protection--------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_eye_protection == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(eye_protection_shortage = n_distinct(week_ending)) %>%
   filter(eye_protection_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -341,17 +337,17 @@ final_shortage_df %>%
 
 #--------------gowns --------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_gowns == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(gowns_shortage = n_distinct(week_ending)) %>%
   filter(gowns_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -361,17 +357,17 @@ final_shortage_df %>%
 
 #--------------gloves --------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_gloves == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(gloves_shortage = n_distinct(week_ending)) %>%
   filter(gloves_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -381,17 +377,17 @@ final_shortage_df %>%
 
 #--------------hand sanitizer--------------
 county_facilities <- covid_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number))
 
 shortage_weeks_df <- covid_df %>%
   filter(one_week_supply_of_hand_sanitizer == "N") %>%
-  group_by(county, federal_provider_number) %>%
+  group_by(county, federal_provider_number,provider_state) %>%
   summarise(hand_sanitizer_shortage = n_distinct(week_ending)) %>%
   filter(hand_sanitizer_shortage > 10) 
 
 county_shortage <- shortage_weeks_df %>% 
-  group_by(county) %>%
+  group_by(county,provider_state) %>%
   summarise(total_shortage_facilities = n())
 
 final_shortage_df <- full_join(county_shortage, county_facilities, by = c("county"))
@@ -403,14 +399,12 @@ final_shortage_df %>%
 #3.5 All the nursing home facilities that experienced a shortage of ventilator /n'
 'supplies for more than 10 weeks./n'
 
-table <- covid_df %>%
+table_last <- covid_df %>%
   filter(one_week_supply_of_ventilator_supplies == "N") %>%
   group_by(federal_provider_number) %>%
-  summarise(number_of_shortage_of_ventilator_supplies = n_distinct((week_ending))%>%
-  filter(number_of_shortage_of_ventilator_supplies>10)
+  summarise(number_of_shortage_of_ventilator_supplies = n_distinct(week_ending))%>%
+  filter(number_of_shortage_of_ventilator_supplies > 10)
             
-```
-
 
 
 
