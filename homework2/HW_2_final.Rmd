@@ -1,17 +1,19 @@
 ---
-title: "HW2_final"
+title: "HW2_new"
 output: html_document
 ---
-
+```{r}
 library(dplyr)
 library(dlookr)
 library(lubridate)
-
+```
 #Read data
-covid_df <- read.csv("~/Desktop/IE5374HW/HW2/COVID_19_Nursing_Home_Data_2021_09_12.csv")
+```{r}
+covid_df <- read.csv("COVID_19_Nursing_Home_Data_2021_09_12.csv")
 covid_df$week_ending <- as.Date(covid_df$week_ending)
-
+```
 #Problem 1
+```{r}
 options(scipen = 999)
 vector_len <- c(1000, 100000, 1000000, 10000000)
 
@@ -42,9 +44,10 @@ for(l in vector_len){
 'So if we are facing the similiar problem, we should consider other method /n'
 'like vector operation to avoid using for loop./n'
 
-
+```
 
 #Problem 2
+```{r}
 #'Write a custom function that accepts a dataframe from the user and returns a dataframesample /n'
 'with a random number of records. The fraction of records must be given by the user /n'
 'inthe form of an argument. If the user enters a non-numeric argument, notify /n'
@@ -67,8 +70,9 @@ frac_rows <- function(df, n = 1000){
 }
 
 df_subset <- frac_rows(covid_df, 100)
-
+```
 #3.1  Number of nursing home facilities by state and order them in descending order
+```{r}
 covid_df %>%
   group_by(provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number)) %>%
@@ -78,17 +82,20 @@ covid_df %>%
 temp <- covid_df[covid_df$provider_state == "CA",]
 length(unique(temp$federal_provider_number ))
 
-
+```
 
 #3.2 Top five counties by number of nursing home facilities
+```{r}
 covid_df %>%
   group_by(county,provider_state) %>%
   summarise(total_facilities = n_distinct(federal_provider_number)) %>%
   arrange(desc(total_facilities)) %>%
   top_n(5)
+```
 
 
 #3.3 
+```{r}
 'Four tables containing the states which experienced more than 20 weeks of /n'
 'shortage of nursing staff (table 1), clinical staff (table 2), aides (table 3),/n'
 'and other staff (table 4)/n'
@@ -190,10 +197,11 @@ table_4 %>%
   mutate(shortage_ratio = total_shortage_facilities/total_facilities) %>%
   filter(shortage_ratio > 0.3)
 
-
+```
 #3.4 Counties that faced more than 10 weeks shortage of N95 masks (table 1), /n'
 'surgical masks (table 2), eye protection (table 3), supply of gowns (table 4), /n'
 'supply of gloves (table 5), and supply of hand sanitizer (table 6)/n'
+```{r}
 # we are doing the same approach as we did in 3.3
 
 county_facilities <- covid_df %>% 
@@ -300,14 +308,14 @@ table_6 %>%
   mutate(shortage_ratio = total_shortage_facilities/total_facilities) %>%
   filter(shortage_ratio > 0.6)
 
-
+```
 #3.5 'All the nursing home facilities that experienced a shortage of ventilator /n'
 'supplies for more than 10 weeks./n'
+```{r}
 
 table_last <- covid_df %>%
   filter(one_week_supply_of_ventilator_supplies == "N") %>%
   group_by(federal_provider_number) %>%
   summarise(number_of_shortage_of_ventilator_supplies = n_distinct(week_ending))%>%
   filter(number_of_shortage_of_ventilator_supplies > 10)
-            
-
+```
