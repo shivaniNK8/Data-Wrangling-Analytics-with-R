@@ -1,0 +1,1006 @@
+
+---
+title: "Project 1"
+output: html_document
+---
+# Group 7
+# Submitted by: Luyao Xu, Shivani Shrikant Naik, Zijie Li
+
+```{r message=FALSE}
+library(NbClust)
+library(factoextra)
+library(ClusterR)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(VIM)
+library(fpc)
+library(plotly)
+library(clValid)
+library(scatterplot3d)
+library(plot3D)
+```
+
+# Evaluation Metrics Used
+
+## External validation
+
+> 1. Jaccard Index
+
+$$ J= \frac{TP}{TP+FP+FN}$$
+$$ J= \frac{ \sum_{ij}\binom{n_{ij}}{2} }{ \sum_i\binom{n_i}{2} + \sum_j\binom{n_j}{2} - \sum_{ij}\binom{n_{ij}}{2}}$$
+> 2. Purity
+
+$$ U = \sum_{i}{p_i}(\max_j\frac{p_{ij}}{p_i}) $$
+# Internal validation 
+
+> Calisnki-Harabasz Coefficient
+
+$$ CH = \frac{ \frac{SSB_M}{(M-1)} }{ \frac{SSE_M}{(M)} } $$
+$$ SSB = \sum_{i = 1}^{K}m_i d(c_i,c)^2 = \frac{1}{2K} \sum_{i=1}^{K} \sum_{j=1}^{K} \frac{m}{K}d(c_i, c_j)^2$$
+$$ SSE(C_i) =  \sum_{x \in C_i} d(c_i, x)^2 = \frac{1}{2m}\sum_{x \in C_i}\sum_{y \in C_i}d(x,y)^2 $$ 
+
+# Loading Datasets
+```{r}
+data1 <- read.csv('Data1.csv')
+data2 <- read.csv('Data2.csv')
+data3 <- read.csv('Data3.csv')
+data4 <- read.csv('Data4.csv')
+data5 <- read.csv('Data5.csv')
+data6 <- read.csv('Data6.csv')
+data7 <- read.csv('Data7.csv')
+data8 <- read.csv('Data8.csv')
+world_data <- read.csv('World Indicators.csv')
+```
+
+```{r}
+#create new functions for elbow method
+elbow_method_wss <- function(k){
+   wss<-fviz_nbclust(k,kmeans,method='wss')
+   return(wss)
+}
+elbow_method_silhouette <- function(k){
+  sil<-fviz_nbclust(k,kmeans,method='silhouette')
+  return(sil)
+  
+}
+```
+# Dataset 1
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data1[,2:4])
+elbow_method_silhouette(data1[,2:4])
+```
+
+```{r}
+#Setting k = 6 from silhouette recommendation
+k <- 6
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-2):(k+2)){
+  km <- kmeans(data1[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data1[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> After obeserving clustering plots, we select k = 7 as it gives best clustering
+
+```{r}
+km <- kmeans(data1[, 2:4], 7, nstart = 20)
+data1$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data1$Class, clusters = data1$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> Jaccard index = 1, purity = 1 for our clustering solution
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data1[,2:4]))
+hc.single <- hclust(dist(data1[,2:4]), method = 'single')
+plot(hc.single)
+```
+> From dendrogram, we can set number of clusters = 7
+
+#external validation
+```{r}
+data1$h_cluster <- cutree(hc.single, 7)
+external_validation(true_labels = data1$Class, clusters = data1$h_cluster, method = 'jaccard_index', summary_stats = T)
+```
+ 
+ > #purity=1 jaccard-index=1
+
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data1, x = ~X1, y = ~X2, z = ~X3, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to Kmeans cluster
+fig <- plot_ly(data1, x = ~X1, y = ~X2, z = ~X3, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data1, x = ~X1, y = ~X2, z = ~X3, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+```
+
+#Alternative plot methods bt scatter3D
+```{r}
+#plot data by class
+scatterplot3d(data1$X1,data1$X2,data1$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data1$Class))
+#plot by clustering algorithm of K-means
+scatterplot3d(data1$X1,data1$X2,data1$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data1$kmeans_cluster))
+#plot by clustering algorithm of hierarchical
+scatterplot3d(data1$X1,data1$X2,data1$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data1$h_cluster))  
+```
+
+# Dataset 2
+> We check K value recommendation from elbow method and silhouette method
+
+```{r}
+set.seed(10)
+elbow_method_wss(data2[,2:4])
+elbow_method_silhouette(data2[,2:4])
+```
+
+```{r}
+#Setting k = 4 from silhouette recommendation
+k <- 4
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-2):(k+2)){
+  km <- kmeans(data2[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data2[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> CH value for k = 5 is greater than CH value for k = 4, so we select k = 5
+
+```{r}
+km <- kmeans(data2[, 2:4], 5, nstart = 20)
+data2$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data2$Class, clusters = data2$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+
+> Jaccard index = 0.58, purity = 98 for our clustering solution
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data2[,2:4]))
+hc.centroid <- hclust(dist(data2[,2:4]), method = 'centroid')
+plot(hc.centroid)
+#Using "method" as "centroid" gives better clustering results than "single". Observing the dengrogram, we can cut the dendrogram to create 4 clusters
+```
+> From dendrogram, we can set number of clusters = 4
+
+#external validation
+```{r}
+data2$h_cluster <- cutree(hc.centroid, 4)
+external_validation(true_labels = data2$Class, clusters = data2$h_cluster, method = 'jaccard_index', summary_stats = T)
+#purity=1 jaccard-index=1
+```
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data2, x = ~X, y = ~Y, z = ~C, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X'),
+                     yaxis = list(title = 'Y'),
+                     zaxis = list(title = 'C')))
+fig
+#3d plotting according to Kmeans cluster
+
+fig <- plot_ly(data2, x = ~X, y = ~Y, z = ~C, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X'),
+                     yaxis = list(title = 'Y'),
+                     zaxis = list(title = 'C')))
+fig
+
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data2, x = ~X, y = ~Y, z = ~C, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X'),
+                     yaxis = list(title = 'Y'),
+                     zaxis = list(title = 'C')))
+fig
+```
+
+#Alternative plot methods bt scatter3D
+```{r}
+#plot data by class
+scatterplot3d(data2$X,data2$Y,data2$C,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data2$Class))
+#plot by clustering algorithm of K-means
+scatterplot3d(data2$X,data2$Y,data2$C,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data2$kmeans_cluster))
+#plot by clustering algorithm of hierarchical
+scatterplot3d(data2$X,data2$Y,data2$C,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data2$h_cluster))  
+```
+
+# Dataset 3
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data3[,2:4])
+elbow_method_silhouette(data3[,2:4])
+```
+
+```{r}
+#Setting k = 4 from silhouette recommendation
+k <- 4
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-2):(k+2)){
+  km <- kmeans(data3[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data2[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> CH value for k = 4 is the highest
+
+```{r}
+km <- kmeans(data3[, 2:4], 4, nstart = 20)
+data3$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data3$Class, clusters = data3$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> Jaccard index = 1, purity = 1 for our clustering solution
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data3[,2:4]))
+hc.centroid <- hclust(dist(data3[,2:4]), method = 'centroid')
+plot(hc.centroid)
+#Using "method" as "centroid" gives better clustering results than "single". Observing the dengrogram, we can cut the dendrogram to create 4 clusters
+```
+> From dendrogram, we can set number of clusters = 4
+
+#external validation
+```{r}
+data3$h_cluster <- cutree(hc.centroid, 4)
+external_validation(true_labels = data3$Class, clusters = data3$h_cluster, method = 'jaccard_index', summary_stats = T)
+
+```
+
+> Jaccard index = 0.95 and purity = 0.98 for our hierarchichal clustering
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data3, x = ~X1, y = ~X2, z = ~X3, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to Kmeans cluster
+fig <- plot_ly(data3, x = ~X1, y = ~X2, z = ~X3, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data3, x = ~X1, y = ~X2, z = ~X3, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+```
+
+#Alternative plot methods bt scatter3D
+```{r}
+#plot data by class
+scatterplot3d(data3$X1,data3$X2,data3$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data3$Class))
+#plot by clustering algorithm of K-means
+scatterplot3d(data3$X1,data3$X2,data3$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data3$kmeans_cluster))
+#plot by clustering algorithm of hierarchical
+scatterplot3d(data3$X1,data3$X2,data3$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data3$h_cluster)) 
+```
+
+# Dataset 4
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data4[,2:4])
+elbow_method_silhouette(data4[,2:4])
+```
+
+```{r}
+#Setting k = 8 from silhouette recommendation
+k <- 8
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-6):(k+5)){
+  km <- kmeans(data4[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data4[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> CH value keeps increasing, CH value for k=2 (actual k) is significantly less. Keeping k = 8
+
+```{r}
+km <- kmeans(data4[, 2:4], 8, nstart = 20)
+data4$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data4$Class, clusters = data4$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> Jaccard index = 0.25, purity = 1 for our clustering solution
+
+#hierachy clustering
+
+
+```{r}
+dist_matrix <- as.matrix(dist(data4[,2:4]))
+hc.single <- hclust(dist(data4[,2:4]), method = 'single')
+plot(hc.single)
+```
+> Using "method" as "single" gives better clustering results than "centroid" in this example.. From dendrogram, we can set number of clusters = 2
+
+#external validation
+```{r}
+data4$h_cluster <- cutree(hc.single, 2)
+external_validation(true_labels = data4$Class, clusters = data4$h_cluster, method = 'jaccard_index', summary_stats = T)
+
+```
+
+> Jaccard index = 1 and purity = 1 for our hierarchichal clustering, which is perfect clustering and significantly better than K-means. Hierarchical clustering outperforms K-means here.
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data4, x = ~X1, y = ~X2, z = ~X3, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to Kmeans cluster
+fig <- plot_ly(data4, x = ~X1, y = ~X2, z = ~X3, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data4, x = ~X1, y = ~X2, z = ~X3, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+```
+
+#Alternative plot methods bt scatter3D
+```{r}
+#plot data by class
+scatterplot3d(data4$X1,data4$X2,data4$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data4$Class))
+#plot by clustering algorithm of K-means
+scatterplot3d(data4$X1,data4$X2,data4$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data4$kmeans_cluster))
+#plot by clustering algorithm of hierarchical
+scatterplot3d(data4$X1,data4$X2,data4$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data4$h_cluster))  
+```
+
+# Dataset 5
+> We check K value recommendation from elbow method and silhouette method
+
+```{r}
+set.seed(10)
+elbow_method_wss(data5[,2:4])
+elbow_method_silhouette(data5[,2:4])
+```
+
+```{r}
+#Setting k = 10 from silhouette recommendation
+k <- 10
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-8):(k+5)){
+  km <- kmeans(data5[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data5[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> CH value keeps increasing, CH value for k=2 (actual k) is significantly less. Keeping k = 10
+
+```{r}
+km <- kmeans(data5[, 2:4], 10, nstart = 20)
+data5$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data5$Class, clusters = data5$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> Jaccard index = 0.56, purity = 1 for our clustering solution
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data5[,2:4]))
+hc.single <- hclust(dist(data5[,2:4]), method = 'single')
+plot(hc.single)
+```
+> From dendrogram, we can set number of clusters = 2
+
+#external validation
+```{r}
+data5$h_cluster <- cutree(hc.single, 2)
+external_validation(true_labels = data5$Class, clusters = data5$h_cluster, method = 'jaccard_index', summary_stats = T)
+
+```
+
+> Jaccard index = 1 and purity = 1 for our hierarchichal clustering, which is perfect clustering and significantly better than K-means. Hierarchical clustering outperforms K-means here.
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data5, x = ~X1, y = ~X2, z = ~X3, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to Kmeans cluster
+fig <- plot_ly(data5, x = ~X1, y = ~X2, z = ~X3, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data5, x = ~X1, y = ~X2, z = ~X3, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+```
+
+#Alternative plot methods bt scatter3D
+```{r}
+#plot data by class
+scatterplot3d(data5$X1,data5$X2,data5$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data5$Class))
+#plot by clustering algorithm of K-means
+scatterplot3d(data5$X1,data5$X2,data5$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data5$kmeans_cluster))
+#plot by clustering algorithm of hierarchical
+scatterplot3d(data5$X1,data5$X2,data5$X3,main="Data1",xlab="X1",ylab="X2",zlab="X3",pch=16,color = as.numeric(data5$h_cluster))  
+```
+
+# Dataset 6
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data6[,2:4])
+elbow_method_silhouette(data6[,2:4])
+```
+
+```{r}
+#Setting k = 3 from silhouette recommendation
+k <- 3
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-1):(k+2)){
+  km <- kmeans(data6[, 2:4], i, nstart = 20)
+  ch <- round(calinhara(data6[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> from CH value we know k=3 greater than k=2
+
+```{r}
+km <- kmeans(data6[, 2:4],2, nstart = 20)
+data6$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data6$Class, clusters = data6$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> for k = 3,  Jaccard index = 0.63, purity = 0.95 ; For k = 2, we have a higher jaccard index (0.87) and higher purity (0.96), so we keep k = 2
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data6[,2:4]))
+hc.complete <- hclust(dist(data6[,2:4]), method = 'complete')
+plot(hc.complete)
+```
+> From dendrogram, we can set number of clusters = 2
+
+#external validation
+```{r}
+data6$h_cluster <- cutree(hc.complete, 2)
+external_validation(true_labels = data6$Class, clusters = data6$h_cluster, method = 'jaccard_index', summary_stats = T)
+```
+
+> Jaccard index = 0.54 and purity = 0.80 for our hierarchical clustering 
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+ggplot(data6,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(Class))) +
+  geom_point()
+ggplot(data6,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+ggplot(data6,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+
+#Alternative plotting method
+
+#plotting data
+```{r}
+#by Class
+X1<-data6$X1
+X2<-data6$X2
+scatter2D(X1,X2,colvar = data6$Class,bty = "b2")
+```
+
+```{r}
+#by kmeans
+X1<-data6$X1
+X2<-data6$X2
+scatter2D(X1,X2,colvar = data6$kmeans_cluster,bty = "b2")
+```
+
+```{r}
+#by hierarchy clustering
+X1<-data6$X1
+X2<-data6$X2
+scatter2D(X1,X2,colvar = data6$h_cluster,bty = "b2")
+```
+
+# Dataset 7
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data7[,2:3])
+elbow_method_silhouette(data7[,2:3])
+```
+
+```{r}
+#Setting k = 6 from silhouette recommendation
+k <- 6
+
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-2):(k+2)){
+  km <- kmeans(data7[, 2:3], i, nstart = 20)
+  ch <- round(calinhara(data7[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> from CH value k=6 is highest
+
+```{r}
+km <- kmeans(data7[, 2:3],6, nstart = 20)
+data7$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data7$Class, clusters = data7$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+>Jaccard index = 0.63, purity = 0.98 for k = 6
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data7[,2:3]))
+hc.single <- hclust(dist(data7[,2:3]), method = 'single')
+plot(hc.single)
+```
+> From dendrogram, we can set number of clusters = 6
+
+#external validation
+```{r}
+data7$h_cluster <- cutree(hc.single, 6)
+external_validation(true_labels = data7$Class, clusters = data7$h_cluster, method = 'jaccard_index', summary_stats = T)
+
+
+```
+> Jaccard index = 1 and purity = 1 for our hierarchichal clustering, which is perfect clustering.From the visualisations we can see that Hierarchical performs much better than kmeans clustering.
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+ggplot(data7,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(Class))) +
+  geom_point()
+ggplot(data7,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+ggplot(data7,
+       aes(x = X1,
+           y = X2,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+
+#Alternative plotting method
+```{r}
+#by Class
+X1<-data7$X1
+X2<-data7$X2
+scatter2D(X1,X2,colvar = data7$Class,bty = "b2")
+```
+
+```{r}
+#by kmeans
+X1<-data7$X1
+X2<-data7$X2
+scatter2D(X1,X2,colvar = data7$kmeans_cluster,bty = "b2")
+```
+
+```{r}
+#by hierarchy clustering
+X1<-data7$X1
+X2<-data7$X2
+scatter2D(X1,X2,colvar = data7$h_cluster,bty = "b2")
+```
+
+# Dataset 8
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(data8[,2:4])
+elbow_method_silhouette(data8[,2:4])
+```
+
+```{r}
+#Setting k = 6 from silhouette recommendation
+k <- 6
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k-5):(k+5)){
+  km <- kmeans(data8[, 2:4], i, nstart = 20, iter.max = 15)
+  ch <- round(calinhara(data8[, 2:4],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+
+> CH value is the highest when k=6
+
+```{r}
+km <- kmeans(data8[, 2:4], 6, nstart = 20)
+data8$kmeans_cluster <- km$cluster
+#Display external_validation stats
+external_validation(true_labels = data8$Class, clusters = data8$kmeans_cluster, method = 'jaccard_index', summary_stats = T)
+```
+
+> Jaccard index = 0.16, purity = 1 for our clustering solution, which suggests we have many clusters that have high cohesion, but overall clustering is not that good. This is due to structure of data and kmeans is not able to find proper clustering in this dataset which will be clear from visualisation, as the data has only 1 class
+
+#hierachy clustering
+```{r}
+dist_matrix <- as.matrix(dist(data8[,2:4]))
+hc.single <- hclust(dist(data8[,2:4]), method = 'single')
+plot(hc.single)
+```
+> From dendrogram, we can set number of clusters = 2
+
+#external validation
+```{r}
+data8$h_cluster <- cutree(hc.single, 2)
+external_validation(true_labels = data8$Class, clusters = data8$h_cluster, method = 'jaccard_index', summary_stats = T)
+```
+> Jaccard index = 0.99 and purity = 1 for our hierarchichal clustering, which significantly better than K-means. Hierarchical clust
+
+## Plotting data according to actual class, Kmeans clustering and Hierarchical clustering 
+
+```{r}
+#3d plotting according to actual class
+fig <- plot_ly(data8, x = ~X1, y = ~X2, z = ~X3, color = ~Class)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to Kmeans cluster
+fig <- plot_ly(data8, x = ~X1, y = ~X2, z = ~X3, color = ~kmeans_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+#3d plotting according to hierarchical cluster
+fig <- plot_ly(data8, x = ~X1, y = ~X2, z = ~X3, color = ~h_cluster)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'X1'),
+                     yaxis = list(title = 'X2'),
+                     zaxis = list(title = 'X3')))
+fig
+```
+
+# Task 2
+## Data preparation
+
+
+```{r}
+summary(world_data)
+#Remove commas and $ from GDP and Capita columns
+world_data$GDP <- as.factor(gsub(",", "", world_data$GDP))
+world_data$GDP <- as.numeric(gsub("\\$", "", world_data$GDP))
+world_data$Health.Exp.Capita <- as.factor(gsub(",", "", world_data$Health.Exp.Capita))
+world_data$Health.Exp.Capita <- as.numeric(gsub("\\$", "", world_data$Health.Exp.Capita))
+#Remove % from Tax rate column
+world_data$Business.Tax.Rate <- as.numeric(sub("%", "",world_data$Business.Tax.Rate))
+#Remove energy usage and lending interest as they have high number of NAs
+world_data <- world_data %>%
+                        select(-Energy.Usage, -Lending.Interest)
+world_data <- na.omit(world_data)
+
+#scaled_world_data <- scale(world_data[, 1:18])
+#Scale the data
+scaled_world_data_NA <- world_data[,1:16] %>%
+                      mutate_all(~(scale(.) %>% as.vector))
+scaled_world_data_NA$Region <-  world_data$Region
+scaled_world_data_NA$Country <- world_data$Country
+```
+
+#We check K value recommendation from elbow method and silhouette method
+```{r}
+set.seed(10)
+elbow_method_wss(scaled_world_data_NA[,1:16])
+elbow_method_silhouette(scaled_world_data_NA[,1:16])
+```
+> K suggested by elbow and silhouette method = 2
+
+```{r}
+#Setting k = 2 from silhouette recommendation
+k <- 2
+#Checking CH value for k values around the suggested k-value
+print("K CH Value")
+for(i in (k):(k+4)){
+  km <- kmeans(scaled_world_data_NA[,1:16], i, nstart = 20)
+  ch <- round(calinhara(scaled_world_data_NA[,1:16],km$cluster),digits=2)
+  print(paste(i,ch))
+}
+```
+>  Keeping k = 2 as it has highest CH value
+
+```{r}
+k <- 2
+km <- kmeans(scaled_world_data_NA[, 1:16], k, nstart = 20)
+scaled_world_data_NA$kmeans_cluster <- km$cluster
+world_data$kmeans_cluster <- km$cluster
+
+```
+
+> CH value is highest for K = 2, so we select K = 2
+
+```{r}
+world_valid <- scaled_world_data_NA %>%
+                        select(-Region,-Country)
+clmethods <- c("hierarchical","kmeans")
+inter <- clValid(world_valid, nClust = 2:6,clMethods = clmethods, validation = "internal")
+summary(inter)
+```
+## Hierarchical clustering
+```{r}
+dist_matrix <- as.matrix(dist(scaled_world_data_NA[,1:16]))
+hc.single <- hclust(dist(scaled_world_data_NA[,1:16]), method = 'complete')
+plot(hc.single)
+```
+>  Observing the dendrogram, we can cut the dendrogram to create 4 clusters to create balanced clusters. For k =2 or 3, only 1 data point is assigned to one cluster. We tried various "methods" for linkage and "complete" seems to give best solution.
+
+```{r}
+scaled_world_data_NA$h_cluster <- cutree(hc.single,4)
+world_data$h_cluster <- scaled_world_data_NA$h_cluster
+```
+
+
+## Detailed list of countries according to Kmeans groups
+```{r}
+
+output_df <- world_data %>%
+  select(kmeans_cluster, Country) %>%
+  group_by(kmeans_cluster) %>%
+  summarize(country_cluster = str_c(Country, collapse = ";  "))
+output_df <- as.data.frame(output_df)
+
+cluster1 <- subset(scaled_world_data_NA,kmeans_cluster==1,select = c(Region,Country))
+cluster2 <- subset(scaled_world_data_NA,kmeans_cluster==2,select = c(Region,Country))
+
+cluster1
+cluster2
+
+print(paste('CLUSTER 1: ', output_df[1,2]))
+print(paste0('CLUSTER 2: ', output_df[2,2]))
+```
+## Detailed list of countries according to Hierarchical clustering groups
+
+```{r}
+
+output_df <- world_data %>%
+  select(h_cluster, Country) %>%
+  group_by(h_cluster) %>%
+  summarize(country_cluster = str_c(Country, collapse = ";  "))
+output_df <- as.data.frame(output_df)
+
+cluster1 <- subset(scaled_world_data_NA,h_cluster==1,select = c(Region,Country))
+cluster2 <- subset(scaled_world_data_NA,h_cluster==2,select = c(Region,Country))
+cluster3 <- subset(scaled_world_data_NA,h_cluster==3,select = c(Region,Country))
+cluster4 <- subset(scaled_world_data_NA,h_cluster==4,select = c(Region,Country))
+
+
+cluster1
+cluster2
+cluster3
+cluster4
+
+print(paste('CLUSTER 1: ', output_df[1,2]))
+print(paste0('CLUSTER 2: ', output_df[2,2]))
+print(paste('CLUSTER 3: ', output_df[3,2]))
+print(paste0('CLUSTER 4: ', output_df[4,2]))
+
+```
+
+
+## Generating scatter plots, for both Kmeans and Hierarchical clustering
+
+> Birth.Rate vs Female Life Expectancy
+
+
+```{r}
+#USing Kmeans clustering
+ggplot(world_data,
+       aes(x = Birth.Rate,
+           y = Life.Expectancy.Female,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+
+#Using Hierearchical clustering
+ggplot(world_data,
+       aes(x = Birth.Rate,
+           y = Life.Expectancy.Female,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+> Urban Population vs Mobile Phone Usage
+
+
+```{r}
+#Using Kmeans clustering
+
+ggplot(world_data,
+       aes(x = Population.Urban,
+           y = Mobile.Phone.Usage,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+
+#Using Hierearchical clustering
+
+ggplot(world_data,
+       aes(x = Population.Urban,
+           y = Mobile.Phone.Usage,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+> Urban Population vs Hours to do Tax
+
+
+```{r}
+#Using Kmeans clustering
+
+ggplot(world_data,
+       aes(x = Population.Urban,
+           y = Hours.to.do.Tax,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+
+#Using Hierearchical clustering
+
+ggplot(world_data,
+       aes(x = Population.Urban,
+           y = Hours.to.do.Tax,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+> GDP vs Birth rate
+
+```{r}
+#Using kmeans cluster
+X1<-world_data$GDP
+X2<-world_data$Birth.Rate
+scatter2D(X1,X2,xlab="GDP",ylab="Birth rate",colvar = world_data$kmeans_cluster,bty = "b2")
+
+#Using hierarchical cluster
+X1<-world_data$GDP
+X2<-world_data$Birth.Rate
+scatter2D(X1,X2,xlab="GDP",ylab="Birth rate",colvar = world_data$h_cluster,bty = "b2")
+```
+>  "GDP vs internet usage", "GDP vs Infant mortality" and "GDP vs Birthrate"
+
+
+```{r}
+
+#1
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Internet.Usage,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Internet.Usage,
+           color = as.factor(h_cluster))) +
+  geom_point()
+#2
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Infant.Mortality.Rate ,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Infant.Mortality.Rate ,
+           color = as.factor(h_cluster))) +
+  geom_point()
+#3
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Birth.Rate,
+           color = as.factor(kmeans_cluster))) +
+  geom_point()
+ggplot(scaled_world_data_NA,
+       aes(x = GDP,
+           y = Birth.Rate,
+           color = as.factor(h_cluster))) +
+  geom_point()
+```
+#Alternative plot method
+```{r}
+#1
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Internet.Usage",colvar = scaled_world_data_NA$kmeans_cluster,bty = "b2")
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Internet.Usage",colvar = scaled_world_data_NA$h_cluster,bty = "b2")
+
+#2
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Infant.Mortality.Rate",colvar = scaled_world_data_NA$kmeans_cluster,bty = "b2")
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Infant.Mortality.Rate",colvar = scaled_world_data_NA$h_cluster,bty = "b2")
+#3
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Birth.Rate",colvar = scaled_world_data_NA$kmeans_cluster,bty = "b2")
+X1<-scaled_world_data_NA$GDP
+X2<-scaled_world_data_NA$Internet.Usage
+scatter2D(X1,X2,xlab="GDP",ylab="Birth.Rate",colvar = scaled_world_data_NA$h_cluster,bty = "b2")
+```
+
