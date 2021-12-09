@@ -1,0 +1,336 @@
+---
+title: "task 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidytext)
+library(tm)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(igraph)
+library(ggraph)
+library(lubridate)
+```
+
+```{r}
+#read data
+y_2017 <-read.csv('2017.csv')
+y_2018 <-read.csv('2018.csv')
+y_2019 <-read.csv('2019.csv')
+y_2020 <-read.csv('2020.csv')
+y_2021 <-read.csv('2021.csv')
+```
+
+## R Markdown
+```{r}
+snowball_stopwords <- stop_words %>% 
+                    filter(lexicon == 'snowball')
+tweet_2017<- data.frame(y_2017$tweet)
+tweet_2018<- data.frame(y_2018$tweet)
+tweet_2019<- data.frame(y_2019$tweet)
+tweet_2020<- data.frame(y_2020$tweet)
+tweet_2021<- data.frame(y_2021$tweet)
+colnames(tweet_2017)[1] <- "tweet"
+tweet_2017$year <- 2017
+colnames(tweet_2018)[1] <- "tweet"
+tweet_2018$year <- 2018
+colnames(tweet_2019)[1] <- "tweet"
+tweet_2019$year <- 2019
+colnames(tweet_2020)[1] <- "tweet"
+tweet_2020$year <- 2020
+colnames(tweet_2021)[1] <- "tweet"
+tweet_2021$year <- 2021
+```
+
+```{r}
+tweets <- bind_rows(tweet_2017 %>% 
+                      mutate(year = "2017"),
+                    tweet_2018 %>% 
+                      mutate(year = "2018"),
+                    tweet_2019 %>% 
+                      mutate(year = "2019"),
+                    tweet_2020 %>% 
+                      mutate(year = "2020"),
+                    tweet_2021 %>% 
+                      mutate(year = "2021"),)
+```
+
+```{r}
+remove_reg <- "&amp;|&lt;|&gt;"
+remove_url <- "\\s?(f|ht)(tp)(s?)(://)([^\\.]*)[\\.|/](\\S*)"
+new_tweet<-tweets %>%
+  mutate(text = str_remove_all(tweet, remove_reg),
+         text = str_remove_all(tweet, remove_url)) %>%
+  unnest_tokens(word, text, token = "tweets") %>%
+   filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]")) %>%
+  count(year, word, sort = TRUE)
+
+```
+```{r}
+word_total<-new_tweet %>%
+  group_by(year) %>%
+  summarise(total =sum (n))
+```
+```{r}
+frequency <- new_tweet %>%
+  group_by(year) %>%
+  left_join(word_total)%>%
+  mutate(freq = n/total)%>%
+  arrange(desc(freq))
+```
+```{r}
+#Show top 10 frequencies
+top_10_2017<-frequency%>%
+  filter(year==2017)%>%
+  slice_max(order_by = freq,n=10)
+top_10_2018<-frequency%>%
+  filter(year==2018)%>%
+  slice_max(order_by = freq,n=10)
+top_10_2019<-frequency%>%
+  filter(year==2019)%>%
+  slice_max(order_by = freq,n=10)
+top_10_2020<-frequency%>%
+  filter(year==2020)%>%
+  slice_max(order_by = freq,n=10)
+top_10_2021<-frequency%>%
+  filter(year==2021)%>%
+  slice_max(order_by = freq,n=10)
+```
+
+```{r}
+# Plot histogram of word frequencies for each year
+ggplot(frequency, aes(freq, fill = year)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +  #check
+  facet_wrap(~year, ncol = 2, scales = "free_y")
+```
+
+```{r}
+# Zipf's law
+freq_by_rank <- frequency %>% 
+  group_by(year) %>% 
+  mutate(rank = row_number(), 
+         `term frequency` = n/total) %>%
+  ungroup()
+
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = year)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+
+rank_subset <- freq_by_rank %>% 
+  filter(rank < 500,
+         rank > 10)
+
+lm(log10(`term frequency`) ~ log10(rank), data = rank_subset)
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = year)) + 
+  geom_abline(intercept = -0.62, slope = -1.1, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+# bigrams
+get_bigram_network <- function(yr, threshold){
+  
+tweet_bigrams <- tweets %>% 
+                 filter(year==yr) %>%
+                 mutate(tweet = str_remove_all(tweet, "&amp;|&lt;|&gt;"),   
+                        tweet = str_remove_all(tweet, "\\s?(f|ht)(tp)(s?)(://)([^\\.]*)[\\.|/](\\S*)"), 
+                        tweet = str_remove_all(tweet, "[^\x01-\x7F]")    
+                        ) %>% 
+                 unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+#tweet_bigrams %>%
+ # count(bigram, sort = TRUE)
+# bigrams with stop words
+bigrams_separated <- tweet_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) 
+#!word %in% str_remove_all(stop_words$word, "'")
+bigram_counts <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE) %>%
+  drop_na()
+bigrams_united <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+bigram_graph <- bigram_counts %>%
+  filter(n > threshold) %>%
+  graph_from_data_frame()
+return(bigram_graph)
+}
+```
+
+```{r}
+# Create bigram networks 
+bigram_graph_2017 <- get_bigram_network(2017, 4)
+bigram_graph_2018 <- get_bigram_network(2018, 5)
+bigram_graph_2019 <- get_bigram_network(2019, 10)
+bigram_graph_2020 <- get_bigram_network(2020, 11)
+bigram_graph_2021 <- get_bigram_network(2021, 11)
+a <- grid::arrow(type = "closed", length = unit(.1, "inches"))
+# Plot all networks
+ggraph(bigram_graph_2017, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, hjust = 0.7) +
+  theme_void()
+ggraph(bigram_graph_2018, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, hjust = 0.7) +
+  theme_void()
+ggraph(bigram_graph_2019, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, hjust = 0.7) +
+  theme_void()
+ggraph(bigram_graph_2020, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, hjust = 1) +
+  theme_void()
+ggraph(bigram_graph_2021, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, hjust = 0.7) +
+  theme_void()
+```
+```{r}
+# bigrams with stop words
+bigrams_separated <- tweet_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+# new bigram counts:
+bigram_counts <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE)
+
+```
+```{r}
+#2017
+bigram_graph_2017 <- bigram_counts %>%
+  filter(n > 4) %>%
+  graph_from_data_frame()
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+set.seed(2020)
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+#2018
+bigram_graph_2018 <- bigram_counts %>%
+  filter(year==2018) %>%
+  filter(n > 5) %>%
+  graph_from_data_frame()
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+set.seed(2020)
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+#2019
+bigram_graph_2019 <- bigram_counts %>%
+  filter(year==2019) %>%
+  filter(n > 10) %>%
+  graph_from_data_frame()
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+set.seed(2020)
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+#2020
+bigram_graph_2020 <- bigram_counts %>%
+  filter(year==2020) %>%
+  filter(n > 11) %>%
+  graph_from_data_frame()
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+set.seed(2020)
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+#2021
+bigram_graph_2021 <- bigram_counts %>%
+  filter(year==2021) %>%
+  filter(n > 11) %>%
+  graph_from_data_frame()
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+set.seed(2020)
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+
+
+```
+
