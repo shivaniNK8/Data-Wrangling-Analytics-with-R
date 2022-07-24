@@ -1,8 +1,8 @@
 ---
-title: "Project 2"
+title: "Keyword Network Analysis and Word Frequency Analysis"
 output: html_document
 ---
-#Group member:Shivani, Luyao, Zijie
+
 ```{r}
 library(ggplot2)
 library(igraph)
