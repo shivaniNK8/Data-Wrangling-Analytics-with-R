@@ -2,8 +2,7 @@
 title: "HW2_new"
 output: html_document
 ---
-#Group 7
-#Submitted by: Luyao Xu, Shivani Shrikant Naik, Zijie Li
+
 ```{r}
 library(dplyr)
 library(dlookr)
