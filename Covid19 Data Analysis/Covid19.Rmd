@@ -1,5 +1,5 @@
 ---
-title: "HW2_new"
+title: "Covid 19 Data Analysis"
 output: html_document
 ---
 
