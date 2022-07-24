@@ -2,7 +2,6 @@
 title: "Farmers Market"
 output: html_document
 ---
-# Homework 1 (Submitted by: Luyao Xu, Shivani Shrikant Naik, Zijie Li)
 ```{r}
 library(dplyr)
 library(lubridate)
