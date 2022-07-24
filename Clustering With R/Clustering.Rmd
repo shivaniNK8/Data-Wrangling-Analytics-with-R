@@ -1,5 +1,5 @@
 ---
-title: "Project 1"
+title: "Kmeans and Hierarchical Clustering"
 output: html_document
 ---
 
